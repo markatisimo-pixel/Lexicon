@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Lexicon Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #050505; }
+        .rarity-gradient { filter: blur(80px); opacity: 0.15; position: absolute; top: -10%; right: -10%; width: 300px; height: 300px; border-radius: 50%; z-index: 0; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useRef } = React;
+        const { 
+            Timer, Zap, Brain, ShieldAlert, CheckCircle2, XCircle, 
+            RotateCcw, Home, Award, ChevronRight, Layers, Trophy, 
+            User, Star, Sparkles, Flame, Crown 
+        } = lucideReact;
+
+        // Конфигурация Firebase берется из глобальных настроек окружения
+        const apiKey = ""; 
+
+        const RARITY_LEVELS = {
+            common: { label: "Частый", color: "text-slate-400", bg: "bg-slate-500/10", border: "border-slate-500/20", icon: <Star size={14}/>, xp: 5, shadow: "shadow-slate-500/5" },
+            rare: { label: "Редкий", color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/20", icon: <Sparkles size={14}/>, xp: 15, shadow: "shadow-blue-500/5" },
+            legendary: { label: "Легендарный", color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/20", icon: <Crown size={14}/>, xp: 50, shadow: "shadow-yellow-500/10" },
+            mythical: { label: "Мифический", color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/20", icon: <Flame size={14}/>, xp: 150, shadow: "shadow-purple-500/20" }
+        };
+
+        const TERMS_DATABASE = [
+            { term: "Allegro", translation: "Весело", rarity: "common", lang: "it" },
+            { term: "Piano", translation: "Тихо", rarity: "common", lang: "it" },
+            { term: "Forte", translation: "Громко", rarity: "common", lang: "it" },
+            { term: "Largo", translation: "Широко", rarity: "common", lang: "it" },
+            { term: "Presto", translation: "Быстро", rarity: "rare", lang: "it" },
+            { term: "Rubato", translation: "Свободно", rarity: "rare", lang: "it" },
+            { term: "Sforzando", translation: "Внезапно усиливая", rarity: "rare", lang: "it" },
+            { term: "Morendo", translation: "Замирая", rarity: "rare", lang: "it" },
+            { term: "Incalzando", translation: "Ускоряя и усиливая", rarity: "legendary", lang: "it" },
+            { term: "Smorzando", translation: "Угасая", rarity: "legendary", lang: "it" },
+            { term: "Bisbigliando", translation: "Шепотом", rarity: "mythical", lang: "it" },
+            { term: "Klangfarbenmelodie", translation: "Тембровая мелодия", rarity: "mythical", lang: "de" }
+        ];
+
+        const App = () => {
+            const [view, setView] = useState('menu');
+            const [mode, setMode] = useState(null);
+            const [filterRarity, setFilterRarity] = useState('all');
+            const [score, setScore] = useState(0);
+            const [userName, setUserName] = useState("Маэстро");
+            const [currentQuestion, setCurrentQuestion] = useState(null);
+            const [options, setOptions] = useState([]);
+            const [userInput, setUserInput] = useState("");
+            const [timeLeft, setTimeLeft] = useState(10);
+            const [feedback, setFeedback] = useState(null);
+            const [isLoading, setIsLoading] = useState(false);
+            const timerRef = useRef(null);
+
+            const nextQuestion = useCallback(() => {
+                const pool = filterRarity === 'all' ? TERMS_DATABASE : TERMS_DATABASE.filter(t => t.rarity === filterRarity);
+                const q = pool[Math.floor(Math.random() * pool.length)];
+                setCurrentQuestion(q);
+                setUserInput("");
+                setFeedback(null);
+                setTimeLeft(mode === 'bomber' ? 10 : 30);
+
+                if (mode === 'quiz' || mode === 'bomber') {
+                    const dist = [...new Set(TERMS_DATABASE.map(t => t.translation))]
+                        .filter(t => t !== q.translation)
+                        .sort(() => 0.5 - Math.random())
+                        .slice(0, 3);
+                    setOptions([q.translation, ...dist].sort(() => 0.5 - Math.random()));
+                }
+            }, [mode, filterRarity]);
+
+            useEffect(() => {
+                if (view === 'game' && !currentQuestion) nextQuestion();
+            }, [view, currentQuestion, nextQuestion]);
+
+            useEffect(() => {
+                if (mode === 'bomber' && view === 'game' && timeLeft > 0 && !feedback) {
+                    timerRef.current = setTimeout(() => setTimeLeft(p => p - 1), 1000);
+                } else if (timeLeft === 0 && mode === 'bomber' && view === 'game' && !feedback) {
+                    setFeedback({ isCorrect: false, message: "Время истекло!" });
+                }
+                return () => clearTimeout(timerRef.current);
+            }, [timeLeft, mode, feedback, view]);
+
+            const handleAnswer = (isCorrect) => {
+                const xp = RARITY_LEVELS[currentQuestion.rarity].xp;
+                if (isCorrect) {
+                    setScore(s => s + xp);
+                    setFeedback({ isCorrect: true, message: `Верно! +${xp} XP` });
+                } else {
+                    setFeedback({ isCorrect: false, message: `Ошибка. Правильно: ${currentQuestion.translation}` });
+                }
+            };
+
+            const checkHardModeAI = async () => {
+                setIsLoading(true);
+                // Имитация задержки ИИ или простая проверка для примера
+                setTimeout(() => {
+                    handleAnswer(userInput.trim().toLowerCase() === currentQuestion.translation.toLowerCase());
+                    setIsLoading(false);
+                }, 800);
+            };
+
+            return (
+                <div className="min-h-screen max-w-xl mx-auto flex flex-col items-center px-4 py-6">
+                    {/* Header */}
+                    <div className="w-full flex justify-between items-center mb-8">
+                        <button onClick={() => { setView('menu'); setFeedback(null); setCurrentQuestion(null); }} className="p-3 bg-white/5 border border-white/10 rounded-2xl">
+                            <Home size={20} className="text-slate-400" />
+                        </button>
+                        <div className="flex gap-2">
+                            <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 px-4 py-2 rounded-2xl">
+                                <Award size={16} className="text-blue-400" />
+                                <span className="font-mono font-bold text-blue-400">{score}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {view === 'menu' && (
+                        <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <div className="text-center">
+                                <h1 className="text-6xl font-black italic tracking-tighter text-white uppercase mb-2">Lexicon</h1>
+                                <p className="text-slate-500 text-xs font-mono uppercase tracking-widest">Master of Music Terms</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => { setMode('quiz'); setView('rarity'); }} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-white/10 transition-all">
+                                    <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-400"><Brain size={24}/></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Quiz</span>
+                                </button>
+                                <button onClick={() => { setMode('bomber'); setView('rarity'); }} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-white/10 transition-all">
+                                    <div className="p-4 bg-orange-500/10 rounded-2xl text-orange-400"><Zap size={24}/></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Bomber</span>
+                                </button>
+                                <button onClick={() => { setMode('hard'); setView('rarity'); }} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-white/10 transition-all">
+                                    <div className="p-4 bg-red-500/10 rounded-2xl text-red-400"><ShieldAlert size={24}/></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Hard</span>
+                                </button>
+                                <button onClick={() => { setMode('matching'); setView('rarity'); }} className="p-6 bg-white/5 border border-white/10 rounded-[2rem] flex flex-col items-center gap-4 hover:bg-white/10 transition-all">
+                                    <div className="p-4 bg-purple-500/10 rounded-2xl text-purple-400"><Layers size={24}/></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Match</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'rarity' && (
+                        <div className="w-full space-y-3 animate-in fade-in slide-in-from-right duration-300">
+                            <h2 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 px-2 mb-2">Уровень сложности</h2>
+                            <button onClick={() => { setFilterRarity('all'); setView('game'); }} className="w-full p-6 bg-white/5 border border-white/10 rounded-3xl font-bold flex justify-between items-center hover:bg-white/10 transition-all">
+                                Все уровни <Layers size={18} className="text-slate-600"/>
+                            </button>
+                            {Object.entries(RARITY_LEVELS).map(([key, d]) => (
+                                <button key={key} onClick={() => { setFilterRarity(key); setView('game'); }} className={`w-full p-6 bg-white/5 border ${d.border} rounded-3xl flex justify-between items-center hover:bg-white/10 transition-all`}>
+                                    <div className="flex items-center gap-3">
+                                        <span className={d.color}>{d.icon}</span>
+                                        <span className={`font-bold uppercase tracking-widest text-sm ${d.color}`}>{d.label}</span>
+                                    </div>
+                                    <span className="text-xs font-mono opacity-40">{d.xp} XP</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {view === 'game' && currentQuestion && (
+                        <div className="w-full space-y-6">
+                            <div className={`bg-white/5 border-2 ${RARITY_LEVELS[currentQuestion.rarity].border} rounded-[3rem] p-10 relative overflow-hidden ${RARITY_LEVELS[currentQuestion.rarity].shadow}`}>
+                                <div className={`rarity-gradient ${currentQuestion.rarity === 'mythical' ? 'bg-purple-500' : 'bg-blue-500'}`}></div>
+                                
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-center mb-10">
+                                        <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${RARITY_LEVELS[currentQuestion.rarity].border} ${RARITY_LEVELS[currentQuestion.rarity].bg}`}>
+                                            {RARITY_LEVELS[currentQuestion.rarity].icon}
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${RARITY_LEVELS[currentQuestion.rarity].color}`}>
+                                                {RARITY_LEVELS[currentQuestion.rarity].label}
+                                            </span>
+                                        </div>
+                                        {mode === 'bomber' && <div className={`text-4xl font-mono font-black ${timeLeft < 4 ? 'text-red-500 animate-pulse' : 'text-slate-600'}`}>{timeLeft}s</div>}
+                                    </div>
+
+                                    <div className="text-center mb-16">
+                                        <p className="text-[10px] font-mono text-slate-600 uppercase mb-4 tracking-[0.3em]">[{currentQuestion.lang}]</p>
+                                        <h2 className="text-6xl font-black text-white tracking-tighter leading-none">{currentQuestion.term}</h2>
+                                    </div>
+
+                                    {feedback ? (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                            <div className={`p-8 rounded-3xl text-center border ${feedback.isCorrect ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'}`}>
+                                                <p className="font-bold text-lg">{feedback.message}</p>
+                                            </div>
+                                            <button onClick={nextQuestion} className="w-full py-6 bg-white text-black font-black rounded-3xl uppercase text-xs tracking-[0.2em]">Продолжить</button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {mode === 'hard' ? (
+                                                <div className="space-y-3">
+                                                    <input 
+                                                        type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} 
+                                                        className="w-full bg-black border-2 border-white/10 rounded-3xl p-6 text-center text-xl font-bold text-white outline-none focus:border-white transition-all"
+                                                        disabled={isLoading} autoFocus placeholder="Введите перевод..."
+                                                    />
+                                                    <button 
+                                                        onClick={checkHardModeAI} disabled={isLoading || !userInput}
+                                                        className="w-full py-5 bg-blue-600 text-white font-black rounded-3xl uppercase text-xs tracking-widest disabled:opacity-20"
+                                                    >
+                                                        {isLoading ? "Анализ ИИ..." : "Проверить"}
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="grid grid-cols-1 gap-3">
+                                                    {options.map((opt, i) => (
+                                                        <button 
+                                                            key={i} onClick={() => handleAnswer(opt === currentQuestion.translation)}
+                                                            className="p-5 bg-white/5 border border-white/10 rounded-3xl text-center font-bold text-slate-200 hover:bg-white/10 transition-all active:scale-[0.98]"
+                                                        >
+                                                            {opt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
