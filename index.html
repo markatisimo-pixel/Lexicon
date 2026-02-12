@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Music Lexicon Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #050505; 
+            color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .glow {
+            filter: blur(100px);
+            opacity: 0.1;
+            position: absolute;
+            z-index: 0;
+            pointer-events: none;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback, useMemo } = React;
+        const { Home, Award, Trophy, User, Brain, Zap, ShieldAlert, Layers, Star, Sparkles, Crown, Flame, ChevronRight } = lucideReact;
+
+        // База данных терминов
+        const DATABASE = [
+            { term: "Allegro", translation: "Весело", rarity: "common", lang: "it" },
+            { term: "Piano", translation: "Тихо", rarity: "common", lang: "it" },
+            { term: "Forte", translation: "Громко", rarity: "common", lang: "it" },
+            { term: "Adagio", translation: "Медленно", rarity: "common", lang: "it" },
+            { term: "Sforzando", translation: "Внезапно усиливая", rarity: "rare", lang: "it" },
+            { term: "Morendo", translation: "Замирая", rarity: "rare", lang: "it" },
+            { term: "Rubato", translation: "Свободно", rarity: "rare", lang: "it" },
+            { term: "Incalzando", translation: "Ускоряя и усиливая", rarity: "legendary", lang: "it" },
+            { term: "Bisbigliando", translation: "Шепотом", rarity: "mythical", lang: "it" }
+        ];
+
+        const RARITY = {
+            common: { label: "Частый", color: "text-slate-400", border: "border-slate-500/20", icon: <Star size={14}/>, xp: 5 },
+            rare: { label: "Редкий", color: "text-blue-400", border: "border-blue-500/20", icon: <Sparkles size={14}/>, xp: 15 },
+            legendary: { label: "Легендарный", color: "text-yellow-400", border: "border-yellow-500/20", icon: <Crown size={14}/>, xp: 50 },
+            mythical: { label: "Мифический", color: "text-purple-400", border: "border-purple-500/20", icon: <Flame size={14}/>, xp: 150 }
+        };
+
+        const App = () => {
+            const [view, setView] = useState('menu');
+            const [score, setScore] = useState(() => {
+                const saved = localStorage.getItem('music_score');
+                return saved ? parseInt(saved) : 0;
+            });
+            const [currentQ, setCurrentQ] = useState(null);
+            const [options, setOptions] = useState([]);
+            const [feedback, setFeedback] = useState(null);
+
+            useEffect(() => {
+                localStorage.setItem('music_score', score);
+            }, [score]);
+
+            const next = useCallback(() => {
+                const q = DATABASE[Math.floor(Math.random() * DATABASE.length)];
+                setCurrentQ(q);
+                setFeedback(null);
+                const others = [...new Set(DATABASE.map(t => t.translation))]
+                    .filter(t => t !== q.translation)
+                    .sort(() => 0.5 - Math.random())
+                    .slice(0, 3);
+                setOptions([q.translation, ...others].sort(() => 0.5 - Math.random()));
+            }, []);
+
+            useEffect(() => {
+                if (view === 'game' && !currentQ) next();
+            }, [view, currentQ, next]);
+
+            return (
+                <div className="w-full min-h-screen flex flex-col items-center py-10 px-6">
+                    <div className="w-full max-w-md flex justify-between items-center mb-12">
+                        <button onClick={() => { setView('menu'); setCurrentQ(null); }} className="p-3 bg-white/5 border border-white/10 rounded-2xl active:scale-90 transition-transform">
+                            <Home size={20} className="text-slate-400"/>
+                        </button>
+                        <div className="bg-blue-600/10 border border-blue-500/20 px-5 py-2 rounded-2xl text-blue-400 font-bold font-mono tracking-tighter">
+                            {score} XP
+                        </div>
+                    </div>
+
+                    {view === 'menu' ? (
+                        <div className="w-full max-w-md space-y-12 animate-in fade-in duration-700">
+                            <div className="text-center">
+                                <h1 className="text-7xl font-black italic tracking-tighter text-white uppercase leading-none">Lexicon</h1>
+                                <p className="text-slate-500 text-[10px] uppercase tracking-[0.4em] mt-5 font-bold">Musical Pro</p>
+                            </div>
+                            <div className="grid grid-cols-1 gap-4">
+                                <button onClick={() => setView('game')} className="w-full p-8 bg-white/5 border border-white/10 rounded-[2.5rem] flex items-center justify-between px-10 active:scale-95 transition-all">
+                                    <div className="flex items-center gap-6">
+                                        <div className="p-4 bg-blue-500/10 rounded-2xl text-blue-400 border border-blue-500/20"><Brain size={32}/></div>
+                                        <div className="text-left">
+                                            <span className="block font-black text-white text-xl uppercase">Начать</span>
+                                            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Все категории</span>
+                                        </div>
+                                    </div>
+                                    <ChevronRight className="text-slate-700" />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        currentQ && (
+                            <div className={`w-full max-w-md bg-white/5 border-2 ${RARITY[currentQ.rarity].border} rounded-[3rem] p-10 relative overflow-hidden animate-in zoom-in duration-300`}>
+                                <div className={`glow bg-blue-600 -top-20 -right-20`}></div>
+                                <div className="relative z-10">
+                                    <div className="flex justify-center mb-10">
+                                        <div className={`px-5 py-1.5 rounded-full border ${RARITY[currentQ.rarity].border} text-[10px] font-black uppercase tracking-widest ${RARITY[currentQ.rarity].color} bg-black/60`}>
+                                            {RARITY[currentQ.rarity].label}
+                                        </div>
+                                    </div>
+                                    <h2 className="text-5xl font-black text-center mb-16 tracking-tighter leading-none text-white">{currentQ.term}</h2>
+                                    {feedback ? (
+                                        <div className="space-y-4 animate-in slide-in-from-bottom-6 duration-500">
+                                            <div className={`p-8 rounded-[2rem] text-center font-bold text-lg border ${feedback.ok ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
+                                                {feedback.msg}
+                                            </div>
+                                            <button onClick={next} className="w-full py-6 bg-white text-black font-black rounded-[2rem] uppercase text-xs tracking-[0.3em] active:scale-95 transition-all">
+                                                Следующий
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {options.map((opt, i) => (
+                                                <button key={i} onClick={() => {
+                                                    const isOk = opt === currentQ.translation;
+                                                    if (isOk) setScore(s => s + RARITY[currentQ.rarity].xp);
+                                                    setFeedback({ ok: isOk, msg: isOk ? "Правильно!" : `Ошибка: ${currentQ.translation}` });
+                                                }} className="w-full p-6 bg-white/5 border border-white/10 rounded-[2rem] font-bold text-slate-300 active:scale-95 transition-all hover:bg-white/10">
+                                                    {opt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
